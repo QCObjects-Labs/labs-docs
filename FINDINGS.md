@@ -259,3 +259,34 @@ previously wired as a plain base `Component` must declare
 its `done()`) is actually instantiated. Verified end-to-end: Counter `7→8→6`,
 Tabset switches tab `a→b` and toggles the matching panel, with zero exceptions
 and zero network failures.
+## 16. Root/main component `done()` = "root stack built" (intentionally non-blocking)
+
+When you need a single hook for "the page/app is up", make a root component
+that owns the whole stack (the official `layout-basic` pattern) and use its
+`done()`. In the UI kit that is a `<kit-layout>` `com.qcobjects.components.layout.Layout`
+whose `done()` publishes a `window.__layoutReady` snapshot and fires a
+`window.__onQcReady` callback.
+
+Important nuance, verified on QCObjects 2.4.99: the root's `done()` fires when
+the root's own subtree construction **kicks off**, **not** when every nested
+async build has finished. Measuring at the moment the root `done()` runs showed
+`allLoaded:false, loaded:1/9` — only the root itself had reached
+`loaded="true"` — while ~300ms later all widgets report `loaded="true"`. This
+is **intended by the framework**: `done()` deliberately does not block
+subcomponent loading (components "pull" their children asynchronously instead
+of the parent awaiting them).
+
+Consequences for real code:
+
+- Treat root `done()` as the structural "the root's component-stack
+  construction started/finished kicking off" hook, not a hard "all
+  descendants loaded" barrier.
+- To show the fully-loaded tree, re-dump a short settle later (the playground
+  does a `setTimeout(dumpAll, 300)` after `__onQcReady`). Do not replace
+  timers/settles with a strict "all loaded" claim asserted inside `done()`.
+- The reliable per-component lifecycle signal is each component's own
+  `done()` (fires after its template + shadow root are populated) — see §15.
+
+If a hard "every component loaded" barrier is ever required, poll the known
+leaves (`quick-component[loaded="true"]`) rather than assuming root `done()`
+implies it in 2.4.x.
