@@ -211,3 +211,51 @@ A generic CDP runner (`cdp_run.mjs`: url + expression file) evaluates arbitrary
 inspector probes inside the page against the live shadow DOM — the fastest way
 to smoke-test a QCObjects app without code changes. See
 `APPENDIX-TOOLING.md` and the `qcobjects-ui-kit` repo.
+
+## 14. Tailwind reaches the shadow root via runtime `@import` chains
+
+My original assumption was wrong: page-level CSS cannot style content inside a
+native shadow root, so I expected Tailwind classes to be useless there. But the
+`qcobjects-web-2025` reference has a clean pattern that *does* work:
+
+- Each component's `.tpl.html` starts with
+  `<style>@import url("css/components/<w>.css")</style>`.
+- Each compiled `src/css/components/<w>.css` (a thin SCSS entry, tracked as a
+  `*.scss` source at `src/scss/components/*.scss`) is just:
+  `@import url("./../tailwind.css"); @import url("./../theme.css");`
+- `tailwind.css` is the full generated Tailwind build (`@tailwind base;
+  @tailwind components; @tailwind utilities;`).
+
+The browser resolves that nested URL chain **inside the shadow root**, so the
+Tailwind utilities land exactly where the widget's own `<style>` lives. Build
+pipeline: `sass src/scss:src/css` then
+`tailwindcss -i src/css/tailwind-source.css -o src/css/tailwind.css`, then copy
+`src/css` → `browser/css` and esbuild the JS. Verified: computed styles on the
+shadow content report Tailwind tokens (e.g. `text-sky-400` → `rgb(56,189,248)`,
+`bg-slate-800` → `rgb(30,41,59)`, `rounded-xl` → `12px`).
+
+## 15. Per-widget interaction belongs in the component, not a global listener
+
+The UI kit initially handled Counter/Tabset clicks from one `document`-level
+delegated listener using the §12 `composedPath()` trick. Better: the widget
+classes own their behavior. QCObjects gives you the hooks to do this cleanly:
+
+- `done(standardResponse)` is called after the component builds and its shadow
+  root is populated (verified: `this.shadowRoot` is live, `this.body` is the
+  host `quick-component`).
+- `this.hostElements(selector)` is the "body or shadow root depending on the
+  kind" accessor — it returns `shadowRoot.subelements(selector)` for shadowed
+  components and `body.subelements(selector)` otherwise, all dynamically
+  (`subtags` is a convenience getter for the same). `subelements()` itself is a
+  `querySelectorAll`-backed helper available on `Element`, `Document`, and
+  `ShadowRoot`.
+- Attaching listeners directly to the actual shadow elements (via
+  `this.hostElements(...)`) sidesteps shadow-event retargeting entirely — no
+  `composedPath()` needed.
+
+Because interaction is now in the class, a widget like `kit-tabset` that was
+previously wired as a plain base `Component` must declare
+`componentClass="com.qcobjects.components.tabset.Tabset"` so its class (and thus
+its `done()`) is actually instantiated. Verified end-to-end: Counter `7→8→6`,
+Tabset switches tab `a→b` and toggles the matching panel, with zero exceptions
+and zero network failures.
