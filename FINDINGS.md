@@ -335,3 +335,19 @@ panel toggling, Tailwind tokens present (count `rgb(251,146,60)` = `text-orange-
 Also corrected a playground bug: `dumpTree` labelled a named `quick-component`
 with no `componentClass` as `"(none)"`; the correct fallback class is the base
 `Component`, so the label should read `componentClass || "Component"`.
+
+## 18. Tab header CSS class correspondence
+
+- The tabset component uses  as its container class (defined in `src/templates/components/tabset.tpl.html` and `src/scss/components/tabset.scss`).
+
+## 18. Tab header CSS class correspondence
+
+- The tabset component uses `.kit-tabset` as its container class (defined in `src/templates/components/tabset.tpl.html` and `src/scss/components/tabset.scss`).
+- The CSS rule `.kit-tabs .tab.active` did not match the actual DOM because the container class is `.kit-tabset`, not `.kit-tabs`.
+- Fix: changed the selector to `.kit-tabset .tab.active` in both `src/scss/components/tabset.scss` and the compiled `browser/css/components/tabset.css`.
+
+
+- The tabset component uses `.kit-tabset` as its container class (defined in `src/templates/components/tabset.tpl.html` and `src/scss/components/tabset.scss`).
+- The CSS rule `.kit-tabs .tab.active` did not match the actual DOM because the container class is `.kit-tabset`, not `.kit-tabs`.
+- Fix: changed the selector to `.kit-tabset .tab.active` in both `src/scss/components/tabset.scss` and the compiled `browser/css/components/tabset.css`.
+
