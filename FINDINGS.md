@@ -152,3 +152,62 @@ Plus an assets step that copies `src/index.html` and `src/templates/` into
 - `npx skills add qcobjects-skills/scaffolding` works; the trailing
   "PromptScript: global install unsupported" line after a successful
   `-g -y` install is a harmless CLI quirk.
+
+## 10. Class resolution: keep ONE class per namespace (2.4.x quirk)
+
+`ClassFactory("a.b.C")` splits the last segment and looks the class up in
+`Package("a.b")`. Its filter matches classes where
+`__definition.__classType === "C"` **OR** `typeof classFactory === "function"
+&& classFactory.name` (QCObjects.js:1141-1146). The second clause matches
+EVERY named class in the package, and `.reverse()[0]` returns the **last
+registered one** — so registering several classes in one namespace makes
+`componentClass="a.b.C"` resolve to the wrong class for all but the last.
+
+Working pattern (used by the UI kit):
+
+```js
+Package("com.qcobjects.components.card", [Card]);          // one namespace each
+// element:
+// <kit-card componentClass="com.qcobjects.components.card.Card">
+```
+
+(Before the fix, `ClassFactory("com.qcobjects.components.Card")` silently
+returned the `Panel` class, so `{{title}}` never matched its `data`.)
+
+## 11. `data` field vs `data-*` attributes on nested components
+
+The base `Component` constructor merges the element's `data-*` attributes into
+`data` (QCObjects.js:2220-2221):
+
+```html
+<quick-component componentClass="…StatChip" name="statchip" data-stat="14" data-label="smart widgets">
+```
+
+→ `data = { stat: "14", label: "smart widgets" }`.
+
+But a modern subclass `data` field initializes **after** `super()` and
+overwrites that merged object. So a class that wants attribute-driven values
+(widgets nested in external templates, like the panel's chips) must **not**
+declare its own `data` field:
+
+```js
+class StatChip extends Component {   // no data field — inherits attributes
+  name = "statchip";
+  tplsource = "default";
+  tplextension = "tpl.html";
+}
+```
+
+## 12. Events from shadow roots retarget — use `composedPath()`
+
+A `document`-level click listener receives `event.target` as the **host**
+element containing the shadow root, not the button inside it. Get the real
+target with `event.composedPath()[0]`, then `target.getRootNode()` gives the
+`ShadowRoot` for scoped queries (verified in `playground.js` of the UI kit).
+
+## 13. Playground verification harness (extensible)
+
+A generic CDP runner (`cdp_run.mjs`: url + expression file) evaluates arbitrary
+inspector probes inside the page against the live shadow DOM — the fastest way
+to smoke-test a QCObjects app without code changes. See
+`APPENDIX-TOOLING.md` and the `qcobjects-ui-kit` repo.
