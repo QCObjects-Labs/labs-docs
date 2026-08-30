@@ -253,17 +253,19 @@ classes own their behavior. QCObjects gives you the hooks to do this cleanly:
   `this.hostElements(...)`) sidesteps shadow-event retargeting entirely — no
   `composedPath()` needed.
 
-Because interaction is now in the class, a widget like `kit-tabset` that was
-previously wired as a plain base `Component` must declare
+Because interaction is now in the class, a component must declare
 `componentClass="com.qcobjects.components.tabset.Tabset"` so its class (and thus
-its `done()`) is actually instantiated. Verified end-to-end: Counter `7→8→6`,
-Tabset switches tab `a→b` and toggles the matching panel, with zero exceptions
-and zero network failures.
+its `done()`) is actually instantiated rather than a base `Component` (see §17
+for why the kit declares widgets as plain `<quick-component ...>` instead of the
+`kit-*` smart-widget tags). Verified end-to-end: Counter `7→8→6`, Tabset
+switches tab `a→b` and toggles the matching panel, with zero exceptions and zero
+network failures.
 ## 16. Root/main component `done()` = "root stack built" (intentionally non-blocking)
 
 When you need a single hook for "the page/app is up", make a root component
 that owns the whole stack (the official `layout-basic` pattern) and use its
-`done()`. In the UI kit that is a `<kit-layout>` `com.qcobjects.components.layout.Layout`
+`done()`. In the UI kit that is the root
+`<quick-component name="layout" componentClass="com.qcobjects.components.layout.Layout">`
 whose `done()` publishes a `window.__layoutReady` snapshot and fires a
 `window.__onQcReady` callback.
 
@@ -290,3 +292,46 @@ Consequences for real code:
 If a hard "every component loaded" barrier is ever required, poll the known
 leaves (`quick-component[loaded="true"]`) rather than assuming root `done()`
 implies it in 2.4.x.
+
+## 17. Declare components as `<quick-component componentClass="...">`, not `kit-*` smart-widget tags
+
+A symptom reported in the UI kit: every widget 404'd on
+`templates/components/kit-card.tpl.html` (also `kit-counter`, `kit-tabset`,
+`kit-panel`) while the page still loaded.
+
+Root cause: the widgets were declared with the **smart-widget custom-element
+tags** (`<kit-card componentClass="..." name="card">`, registered via
+`RegisterWidgets`). QCObjects' `_ComponentWidget_` transform is supposed to copy
+the tag's attributes (including `componentClass`) onto an inner
+`<quick-component name="...">`. But for widgets nested **inside the shadowed
+`<kit-layout>`**, that attribute copy silently dropped `componentClass` (and
+`id`/`name`) — the inner node was left as `name="kit-card" shadowed="true"` with
+no `componentClass`. `_buildComponentFromElement_` then used `name="kit-card"`
+for the template URI → `kit-card.tpl.html` → 404. Only `kit-layout` itself (the
+shell, not nested) kept its attributes, which is why it still worked.
+
+The robust fix (also the reference `qcobjects-web-2025` pattern) is to **skip
+the smart-widget transform entirely** and declare each widget directly as a
+generic component, with `componentClass` as a plain string attribute:
+
+```html
+<quick-component id="card" name="card" shadowed="true"
+                 componentClass="com.qcobjects.components.card.Card"></quick-component>
+```
+
+- `componentClass` stays a string attribute on the real component element, so
+  the class is resolved and the right `.tpl.html` is fetched (`card.tpl.html`).
+- `shadowed="true"` is needed explicitly (the `kit-*` transform set it
+  automatically) to keep rendering into a native shadow root.
+- Drop `RegisterWidgets("kit-*", ...)` from `init.js` — no longer required.
+- Manual inspection (playground): a `quick-component`'s rendered content lives
+  under a `.shadowHost` div (a native `ShadowRoot`); interact via
+  `this.hostElements(...)` in the component's `done()` (§15).
+
+Verified after the fix: 7 templates load (layout, card, counter, tabset, panel +
+2 statchips) with **0 failed resources**; Counter `7→8→6`, Tabset `a→b` with
+panel toggling, Tailwind tokens present (count `rgb(251,146,60)` = `text-orange-400`).
+
+Also corrected a playground bug: `dumpTree` labelled a named `quick-component`
+with no `componentClass` as `"(none)"`; the correct fallback class is the base
+`Component`, so the label should read `componentClass || "Component"`.

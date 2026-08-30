@@ -14,7 +14,7 @@ organization, and one skill was published to the `qcobjects-skills` org.
 | 1 — Hello world | [`hello-qcobjects`](../hello-qcobjects) | Load the QCObjects browser bundles as vendored scripts; minimal class-based component. | ✅ |
 | 2 — Stock app template | [`qcobjects-app`](../qcobjects-app) | Checked out the official QCObjects app template (`mynewapp`) to study factory-standard layout. | ✅ |
 | 3 — Verified web app | [`qcobjects-web`](../qcobjects-web) | From-scratch app on the 2.4 line; external `.tpl.html` component verified end-to-end in a headless browser. | ✅ |
-| 4 — UI kit playground | [`qcobjects-ui-kit`](../qcobjects-ui-kit) | Reusable widget kit (card, counter, tabset, composed panel with nested components) styled with **Tailwind CSS scoped into shadow roots** and with **widget-owned interaction** via the component `done()`/`hostElements` hooks; a root `layout` component whose `done()` is the "root stack built" hook; plus a live shadow-DOM inspector. Files upstream blocker `QuickCorp/QCObjects#120`. | ✅ |
+| 4 — UI kit playground | [`qcobjects-ui-kit`](../qcobjects-ui-kit) | Reusable widget kit (card, counter, tabset, composed panel with nested components) declared as plain `<quick-component componentClass="...">` elements (shadowed) styled with **Tailwind CSS scoped into shadow roots** and with **widget-owned interaction** via `done()`/`hostElements` hooks; a root `layout` component whose `done()` is the "root stack built" hook; plus a live shadow-DOM inspector. Files upstream blocker `QuickCorp/QCObjects#120`. | ✅ |
 
 ## Companion artifact
 
